@@ -117,7 +117,18 @@ def create_query(user_query, filters, sort="_score", sortDir="desc"):
         must_queries.extend(filters)
 
     query_obj = {
-        "_source": ["productId", "name", "shortDescription", "longDescription", "department", "salesRankShortTerm",  "salesRankMediumTerm", "salesRankLongTerm", "regularPrice", "categoryPath"],
+        "_source": [
+            "productId", 
+            "name", 
+            "shortDescription", 
+            "longDescription",
+            "department",
+            "salesRankShortTerm",  
+            "salesRankMediumTerm", 
+            "salesRankLongTerm",
+            "regularPrice",
+            "categoryPath"
+        ],
         'size': 10,
         "sort": [
             {
@@ -127,8 +138,40 @@ def create_query(user_query, filters, sort="_score", sortDir="desc"):
             }
         ],
         "query": {
-            "bool": {
-                "must": must_queries
+            "function_score": {
+                "query": {
+                    "bool": {
+                        "must": must_queries
+                    }
+                },
+                "boost_mode": "multiply",
+                "score_mode": "avg",
+                "functions": [
+                    {
+                        "field_value_factor": {
+                            "field": "salesRankLongTerm",
+                            "factor": 1.2,
+                            "modifier": "reciprocal",
+                            "missing": 100000000
+                        }
+                    },
+                    {
+                        "field_value_factor": {
+                            "field": "salesRankMediumTerm",
+                            "factor": 1.2,
+                            "modifier": "reciprocal",
+                            "missing": 100000000
+                        }
+                    },
+                    {
+                        "field_value_factor": {
+                            "field": "salesRankShortTerm",
+                            "factor": 1.2,
+                            "modifier": "reciprocal",
+                            "missing": 100000000
+                        }
+                    }
+                ]
             }
         },
         "aggs": {
