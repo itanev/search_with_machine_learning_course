@@ -4,9 +4,13 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 import csv
+from nltk.stem import SnowballStemmer
+from nltk.corpus import stopwords
+from nltk import sent_tokenize, word_tokenize
 
 # Useful if you want to perform stemming.
 import nltk
+nltk.download('punkt')
 stemmer = nltk.stem.PorterStemmer()
 
 categories_file_name = r'/workspace/datasets/product_data/categories/categories_0001_abcat0010000_to_pcmcat99300050000.xml'
@@ -47,10 +51,41 @@ parents_df = pd.DataFrame(list(zip(categories, parents)), columns =['category', 
 # Read the training data into pandas, only keeping queries with non-root categories in our category tree.
 df = pd.read_csv(queries_file_name)[['category', 'query']]
 df = df[df['category'].isin(categories)]
+print(df)
 
-# IMPLEMENT ME: Convert queries to lowercase, and optionally implement other normalization, like stemming.
+# Convert queries to lowercase, and optionally implement other normalization, like stemming.
+def get_parent(candidate:str):
+    return parents_df[parents_df['category']  == candidate]['parent'].values[0]
 
-# IMPLEMENT ME: Roll up categories to ancestors to satisfy the minimum number of queries per category.
+# Clean query
+def clean_query(query):
+    tokens = word_tokenize(query)
+    tokens = [word for word in tokens if (word.isalpha()) & (word not in stopwords.words('english'))]
+    tokens = [word.lower() for word in tokens]
+    tokens = [stemmer.stem(word) for word in tokens]
+
+    if len(tokens) == 0:
+        return np.nan
+    else:
+        transformed_query = " ".join(tokens)
+    return transformed_query
+
+df['query']=df['query'].apply(clean_query)
+df = df.dropna()
+
+# Rollup category
+def rollupCategory(category):
+    if category_counts[category] < min_queries:
+        parent = parents_df[parents_df['category'] == category]
+        if len(parent) == 0:
+            return category
+
+        return parent.iloc[0]['parent']
+
+    print("Category greater than category counts: ", category, category_counts[category])
+    return category
+
+df['category'] = df['category'].apply(rollupCategory)
 
 # Create labels in fastText format.
 df['label'] = '__label__' + df['category']

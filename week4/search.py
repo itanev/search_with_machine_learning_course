@@ -57,8 +57,14 @@ def process_filters(filters_input):
     return filters, display_filters, applied_filters
 
 def get_query_category(user_query, query_class_model):
-    print("IMPLEMENT ME: get_query_category")
-    return None
+    (predictions, scores) = query_class_model.predict(user_query.lower(), 5)
+    valid_categories = []
+
+    for i in range(len(scores)):
+        if scores[i] > 0.4:
+            clean_cat_name = predictions[i].split("__label__")[1]
+            valid_categories.append(clean_cat_name)
+    return valid_categories
 
 
 @bp.route('/query', methods=['GET', 'POST'])
@@ -138,6 +144,17 @@ def query():
     query_class_model = current_app.config["query_model"]
     query_category = get_query_category(user_query, query_class_model)
     if query_category is not None:
+
+        query_obj["query"]["bool"]["must"].append({
+                "bool":{
+                    "should": {
+                        "terms": {
+                            "categoryPathIds.keyword": query_category
+                        }
+                    }
+                }
+            }
+        )
         print("IMPLEMENT ME: add this into the filters object so that it gets applied at search time.  This should look like your `term` filter from week 1 for department but for categories instead")
     #print("query obj: {}".format(query_obj))
     response = opensearch.search(body=query_obj, index=current_app.config["index_name"], explain=explain)
